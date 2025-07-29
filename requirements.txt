@@ -1,0 +1,5 @@
+openai>=1.0.0
+asyncio-throttle>=1.0.2
+python-dotenv>=1.0.0
+aiofiles>=23.0.0
+typing-extensions>=4.0.0
