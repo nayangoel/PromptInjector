@@ -3,7 +3,7 @@
     "target": {
       "type": "openai",
       "endpoint_url": "https://api.openai.com/v1/chat/completions",
-      "api_key": "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",
+      "api_key": "your_api_key_here",
       "model": "gpt-4o-mini",
       "timeout": 30,
       "max_retries": 3
