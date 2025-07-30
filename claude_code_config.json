@@ -1,0 +1,33 @@
+{
+  "api": {
+    "target": {
+      "type": "openai",
+      "endpoint_url": "https://api.openai.com/v1/chat/completions",
+      "api_key": "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",
+      "model": "gpt-4o-mini",
+      "timeout": 30,
+      "max_retries": 3
+    }
+  },
+  "models": {
+    "target_model": "gpt-4o-mini",
+    "max_tokens": 500,
+    "temperature": 0.7
+  },
+  "testing": {
+    "concurrent_tests": 2,
+    "rate_limit_delay": 1.0,
+    "default_static_tests": 20,
+    "default_adaptive_tests": 10
+  },
+  "logging": {
+    "level": "INFO",
+    "log_file": "/Users/nayan/Documents/Code/PromptInjector/prompt_injector_mcp.log",
+    "console_output": true
+  },
+  "security": {
+    "enable_content_filtering": false,
+    "log_sensitive_data": true,
+    "anonymize_results": true
+  }
+}
