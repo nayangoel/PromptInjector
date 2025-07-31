@@ -16,7 +16,7 @@ import random
 from prompt_injector import PromptInjectionTester, InjectionType, TestResult
 from static_prompts import get_static_prompts
 from adaptive_generator import AdaptivePromptGenerator, ResponseAnalyzer
-from openai import OpenAI
+from model_client import BaseModelClient
 
 
 @dataclass
@@ -40,7 +40,7 @@ class TestCampaign:
 class TestOrchestrator:
     """Orchestrates comprehensive prompt injection testing campaigns"""
     
-    def __init__(self, target_client: OpenAI, analyzer_client: OpenAI, config: Dict[str, Any]):
+    def __init__(self, target_client: BaseModelClient, analyzer_client: BaseModelClient, config: Dict[str, Any]):
         self.target_client = target_client
         self.analyzer_client = analyzer_client
         self.config = config

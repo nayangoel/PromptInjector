@@ -12,10 +12,26 @@ from pathlib import Path
 
 
 @dataclass
+class ModelEndpointConfig:
+    """Configuration for a model endpoint"""
+    type: str  # openai, anthropic, ollama, http
+    endpoint_url: str
+    api_key: Optional[str] = None
+    model: str = "default"
+    headers: Optional[Dict[str, str]] = None
+    timeout: int = 30
+    max_retries: int = 3
+
+
+@dataclass
 class APIConfig:
-    """API configuration settings"""
-    target_api_key: str
-    analyzer_api_key: str
+    """API configuration settings - updated for model-agnostic support"""
+    target: ModelEndpointConfig
+    analyzer: Optional[ModelEndpointConfig] = None
+    
+    # Legacy fields for backward compatibility
+    target_api_key: Optional[str] = None
+    analyzer_api_key: Optional[str] = None
     target_base_url: Optional[str] = None
     analyzer_base_url: Optional[str] = None
     timeout: int = 30
@@ -79,8 +95,51 @@ class PromptInjectorConfig:
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'PromptInjectorConfig':
         """Create config from dictionary"""
+        api_config = config_dict.get('api', {})
+        
+        # Handle new format with target/analyzer endpoint configs
+        if 'target' in api_config:
+            target_config = ModelEndpointConfig(**api_config['target'])
+            analyzer_config = None
+            if 'analyzer' in api_config:
+                analyzer_config = ModelEndpointConfig(**api_config['analyzer'])
+            api = APIConfig(target=target_config, analyzer=analyzer_config)
+        else:
+            # Handle legacy format - convert to new format
+            target_config = ModelEndpointConfig(
+                type=api_config.get('target_type', 'openai'),
+                endpoint_url=api_config.get('target_base_url', 'https://api.openai.com/v1/chat/completions'),
+                api_key=api_config.get('target_api_key', ''),
+                model=config_dict.get('models', {}).get('target_model', 'gpt-3.5-turbo'),
+                timeout=api_config.get('timeout', 30),
+                max_retries=api_config.get('max_retries', 3)
+            )
+            
+            # Create analyzer config - set to None if no analyzer is configured (MCP mode)
+            analyzer_config = None
+            if api_config.get('analyzer_api_key') and api_config.get('analyzer_api_key') != 'dummy-key':
+                analyzer_config = ModelEndpointConfig(
+                    type=api_config.get('analyzer_type', 'openai'),
+                    endpoint_url=api_config.get('analyzer_base_url', 'https://api.openai.com/v1/chat/completions'),
+                    api_key=api_config.get('analyzer_api_key'),
+                    model=config_dict.get('models', {}).get('analyzer_model', 'gpt-4'),
+                    timeout=api_config.get('timeout', 30),
+                    max_retries=api_config.get('max_retries', 3)
+                )
+            api = APIConfig(
+                target=target_config,
+                analyzer=analyzer_config,
+                # Keep legacy fields for compatibility
+                target_api_key=api_config.get('target_api_key'),
+                analyzer_api_key=api_config.get('analyzer_api_key'),
+                target_base_url=api_config.get('target_base_url'),
+                analyzer_base_url=api_config.get('analyzer_base_url'),
+                timeout=api_config.get('timeout', 30),
+                max_retries=api_config.get('max_retries', 3)
+            )
+        
         return cls(
-            api=APIConfig(**config_dict.get('api', {})),
+            api=api,
             models=ModelConfig(**config_dict.get('models', {})),
             testing=TestConfig(**config_dict.get('testing', {})),
             logging=LoggingConfig(**config_dict.get('logging', {})),
@@ -89,8 +148,13 @@ class PromptInjectorConfig:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary"""
+        api_dict = asdict(self.api)
+        # Remove None analyzer to avoid issues
+        if api_dict.get('analyzer') is None:
+            api_dict.pop('analyzer', None)
+        
         return {
-            'api': asdict(self.api),
+            'api': api_dict,
             'models': asdict(self.models),
             'testing': asdict(self.testing),
             'logging': asdict(self.logging),
@@ -147,12 +211,22 @@ class ConfigManager:
         """Get default configuration values"""
         return {
             'api': {
-                'target_api_key': '',
-                'analyzer_api_key': '',
-                'target_base_url': None,
-                'analyzer_base_url': None,
-                'timeout': 30,
-                'max_retries': 3
+                'target': {
+                    'type': 'openai',
+                    'endpoint_url': 'https://api.openai.com/v1/chat/completions',
+                    'api_key': '',
+                    'model': 'gpt-3.5-turbo',
+                    'timeout': 30,
+                    'max_retries': 3
+                },
+                'analyzer': {
+                    'type': 'openai',
+                    'endpoint_url': 'https://api.openai.com/v1/chat/completions',
+                    'api_key': '',
+                    'model': 'gpt-4',
+                    'timeout': 30,
+                    'max_retries': 3
+                }
             },
             'models': {
                 'target_model': 'gpt-3.5-turbo',
@@ -193,11 +267,41 @@ class ConfigManager:
         """Load configuration from environment variables"""
         env_config = {}
         
-        # API configuration
+        # Target model configuration
+        target_config = {}
         if os.getenv(f'{self.ENV_PREFIX}TARGET_API_KEY'):
+            target_config['api_key'] = os.getenv(f'{self.ENV_PREFIX}TARGET_API_KEY')
+        if os.getenv(f'{self.ENV_PREFIX}TARGET_TYPE'):
+            target_config['type'] = os.getenv(f'{self.ENV_PREFIX}TARGET_TYPE')
+        if os.getenv(f'{self.ENV_PREFIX}TARGET_URL'):
+            target_config['endpoint_url'] = os.getenv(f'{self.ENV_PREFIX}TARGET_URL')
+        if os.getenv(f'{self.ENV_PREFIX}TARGET_MODEL'):
+            target_config['model'] = os.getenv(f'{self.ENV_PREFIX}TARGET_MODEL')
+        
+        # Analyzer model configuration
+        analyzer_config = {}
+        if os.getenv(f'{self.ENV_PREFIX}ANALYZER_API_KEY'):
+            analyzer_config['api_key'] = os.getenv(f'{self.ENV_PREFIX}ANALYZER_API_KEY')
+        if os.getenv(f'{self.ENV_PREFIX}ANALYZER_TYPE'):
+            analyzer_config['type'] = os.getenv(f'{self.ENV_PREFIX}ANALYZER_TYPE')
+        if os.getenv(f'{self.ENV_PREFIX}ANALYZER_URL'):
+            analyzer_config['endpoint_url'] = os.getenv(f'{self.ENV_PREFIX}ANALYZER_URL')
+        if os.getenv(f'{self.ENV_PREFIX}ANALYZER_MODEL'):
+            analyzer_config['model'] = os.getenv(f'{self.ENV_PREFIX}ANALYZER_MODEL')
+        
+        # Add to config if any values were set
+        if target_config or analyzer_config:
+            api_config = env_config.setdefault('api', {})
+            if target_config:
+                api_config['target'] = target_config
+            if analyzer_config:
+                api_config['analyzer'] = analyzer_config
+        
+        # Legacy environment variables for backward compatibility
+        if os.getenv(f'{self.ENV_PREFIX}TARGET_API_KEY') and 'api' not in env_config:
             env_config.setdefault('api', {})['target_api_key'] = os.getenv(f'{self.ENV_PREFIX}TARGET_API_KEY')
         
-        if os.getenv(f'{self.ENV_PREFIX}ANALYZER_API_KEY'):
+        if os.getenv(f'{self.ENV_PREFIX}ANALYZER_API_KEY') and 'api' not in env_config:
             env_config.setdefault('api', {})['analyzer_api_key'] = os.getenv(f'{self.ENV_PREFIX}ANALYZER_API_KEY')
         
         if os.getenv(f'{self.ENV_PREFIX}TARGET_BASE_URL'):
@@ -252,11 +356,31 @@ class ConfigManager:
         """Validate configuration has required fields"""
         api_config = config_dict.get('api', {})
         
-        if not api_config.get('target_api_key'):
-            raise ValueError("target_api_key is required. Set it in config file or PI_TARGET_API_KEY environment variable.")
+        # Check new format first
+        if 'target' in api_config:
+            target_config = api_config['target']
+            
+            # Validate target endpoint (always required)
+            if not target_config.get('endpoint_url'):
+                raise ValueError("target endpoint_url is required in api.target configuration.")
+            
+            # API keys may not be required for all endpoints (e.g., local models)
+            # Only validate if the endpoint type typically requires them
+            if target_config.get('type') in ['openai', 'anthropic'] and not target_config.get('api_key'):
+                raise ValueError("target api_key is required for OpenAI/Anthropic endpoints.")
+            
+            # Analyzer is optional (for MCP mode where external agent acts as analyzer)
+            # No validation needed for optional analyzer
         
-        if not api_config.get('analyzer_api_key'):
-            raise ValueError("analyzer_api_key is required. Set it in config file or PI_ANALYZER_API_KEY environment variable.")
+        else:
+            # Legacy format validation
+            if not api_config.get('target_api_key'):
+                raise ValueError("target_api_key is required. Set it in config file or PI_TARGET_API_KEY environment variable.")
+            
+            # Analyzer is optional in legacy format too
+            if api_config.get('analyzer_api_key') and api_config.get('analyzer_api_key') != 'dummy-key':
+                # Only validate if analyzer is actually configured
+                pass
 
 
 def setup_logging(config: LoggingConfig):
@@ -300,23 +424,38 @@ def create_sample_config():
     sample_config = PromptInjectorConfig.from_dict(config_manager._get_default_config())
     
     # Add sample API keys (to be replaced by user)
-    sample_config.api.target_api_key = "your-target-model-api-key-here"
-    sample_config.api.analyzer_api_key = "your-analyzer-model-api-key-here"
+    sample_config.api.target.api_key = "your-target-model-api-key-here"
+    sample_config.api.analyzer.api_key = "your-analyzer-model-api-key-here"
     
     config_manager.save_config(sample_config)
     print(f"Sample configuration created: {config_manager.config_file}")
-    print("Please edit the file to add your actual API keys.")
+    print("Please edit the file to configure your model endpoints.")
+    print("\nExample configurations:")
+    print("- OpenAI: Set type='openai' and add your API key")
+    print("- Local Ollama: Set type='ollama' and endpoint_url='http://localhost:11434'")
+    print("- Custom API: Set type='http' and your custom endpoint URL")
 
 
 def validate_api_keys(config: PromptInjectorConfig) -> bool:
-    """Validate that API keys are properly configured"""
-    if not config.api.target_api_key or config.api.target_api_key == "your-target-model-api-key-here":
-        print("ERROR: Target API key not configured")
+    """Validate that endpoints are properly configured"""
+    # Check target endpoint
+    if not config.api.target.endpoint_url:
+        print("ERROR: Target endpoint URL not configured")
         return False
     
-    if not config.api.analyzer_api_key or config.api.analyzer_api_key == "your-analyzer-model-api-key-here":
-        print("ERROR: Analyzer API key not configured")
-        return False
+    if config.api.target.type in ['openai', 'anthropic']:
+        if not config.api.target.api_key or config.api.target.api_key == "your-target-model-api-key-here":
+            print(f"ERROR: Target API key not configured for {config.api.target.type} endpoint")
+            return False
+    
+    # Analyzer endpoint is optional (for MCP mode)
+    if config.api.analyzer:
+        if config.api.analyzer.type in ['openai', 'anthropic']:
+            if (config.api.analyzer.api_key and 
+                config.api.analyzer.api_key != "dummy-key" and 
+                config.api.analyzer.api_key == "your-analyzer-model-api-key-here"):
+                print(f"ERROR: Analyzer API key not configured for {config.api.analyzer.type} endpoint")
+                return False
     
     return True
 

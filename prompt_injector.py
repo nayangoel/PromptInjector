@@ -13,8 +13,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
-import openai
-from openai import OpenAI
+from model_client import BaseModelClient, ModelRequest, ModelResponse, ModelClientFactory
 
 
 class InjectionType(Enum):
@@ -40,7 +39,7 @@ class TestResult:
 
 
 class PromptInjectionTester:
-    def __init__(self, target_client: OpenAI, analyzer_client: OpenAI, config: Dict[str, Any]):
+    def __init__(self, target_client: BaseModelClient, analyzer_client: BaseModelClient, config: Dict[str, Any]):
         self.target_client = target_client
         self.analyzer_client = analyzer_client
         self.config = config
@@ -63,14 +62,17 @@ class PromptInjectionTester:
         start_time = time.time()
         
         try:
-            response = self.target_client.chat.completions.create(
-                model=self.config['target_model'],
-                messages=[{"role": "user", "content": prompt}],
+            # Create model request
+            request = ModelRequest(
+                prompt=prompt,
+                model=self.config.get('target_model', 'default'),
                 max_tokens=self.config.get('max_tokens', 500),
                 temperature=self.config.get('temperature', 0.7)
             )
             
-            response_text = response.choices[0].message.content
+            # Get response from target model
+            model_response = await self.target_client.generate_response(request)
+            response_text = model_response.content
             response_time = time.time() - start_time
             
             # Analyze the response for injection success
@@ -129,14 +131,17 @@ class PromptInjectionTester:
         """
         
         try:
-            analysis = self.analyzer_client.chat.completions.create(
-                model=self.config['analyzer_model'],
-                messages=[{"role": "user", "content": analysis_prompt}],
+            # Create analyzer request
+            analyzer_request = ModelRequest(
+                prompt=analysis_prompt,
+                model=self.config.get('analyzer_model', 'default'),
                 max_tokens=200,
                 temperature=0.1
             )
             
-            result = json.loads(analysis.choices[0].message.content)
+            # Get analysis from analyzer model
+            analysis_response = await self.analyzer_client.generate_response(analyzer_request)
+            result = json.loads(analysis_response.content)
             return result['success'], result['confidence']
             
         except Exception as e:
@@ -187,14 +192,17 @@ class PromptInjectionTester:
         """
         
         try:
-            response = self.analyzer_client.chat.completions.create(
-                model=self.config['analyzer_model'],
-                messages=[{"role": "user", "content": generation_prompt}],
+            # Create generation request
+            generation_request = ModelRequest(
+                prompt=generation_prompt,
+                model=self.config.get('analyzer_model', 'default'),
                 max_tokens=200,
                 temperature=0.8
             )
             
-            return response.choices[0].message.content.strip()
+            # Get generated prompt from analyzer model
+            generation_response = await self.analyzer_client.generate_response(generation_request)
+            return generation_response.content.strip()
             
         except Exception as e:
             self.logger.error(f"Error generating adaptive prompt: {e}")
