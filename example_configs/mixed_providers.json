@@ -1,0 +1,38 @@
+{
+  "api": {
+    "target": {
+      "type": "http",
+      "endpoint_url": "https://your-custom-api.com/v1/chat",
+      "api_key": "your-custom-api-key",
+      "model": "custom-model-v1",
+      "headers": {
+        "Authorization": "Bearer your-token",
+        "Custom-Header": "custom-value"
+      },
+      "timeout": 30,
+      "max_retries": 3
+    }
+  },
+  "models": {
+    "target_model": "custom-model-v1",
+    "analyzer_model": "claude-3-sonnet-20240229", 
+    "max_tokens": 500,
+    "temperature": 0.7
+  },
+  "testing": {
+    "concurrent_tests": 3,
+    "rate_limit_delay": 1.0,
+    "default_static_tests": 100,
+    "default_adaptive_tests": 50
+  },
+  "logging": {
+    "level": "INFO",
+    "log_file": "prompt_injector.log",
+    "console_output": true
+  },
+  "security": {
+    "enable_content_filtering": true,
+    "log_sensitive_data": false,
+    "anonymize_results": true
+  }
+}

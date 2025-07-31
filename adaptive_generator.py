@@ -9,8 +9,7 @@ import asyncio
 from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 from collections import defaultdict, Counter
-import openai
-from openai import OpenAI
+from model_client import BaseModelClient, ModelRequest
 from prompt_injector import InjectionType, TestResult
 
 
@@ -27,7 +26,7 @@ class PromptPattern:
 class ResponseAnalyzer:
     """Analyzes LLM responses to identify injection success patterns"""
     
-    def __init__(self, analyzer_client: OpenAI):
+    def __init__(self, analyzer_client: BaseModelClient):
         self.analyzer_client = analyzer_client
         self.success_indicators = {
             InjectionType.ROLE_MANIPULATION: [
@@ -132,14 +131,15 @@ class ResponseAnalyzer:
         """
         
         try:
-            response = self.analyzer_client.chat.completions.create(
+            request = ModelRequest(
+                prompt=pattern_prompt,
                 model="gpt-4",
-                messages=[{"role": "user", "content": pattern_prompt}],
                 max_tokens=300,
                 temperature=0.1
             )
             
-            patterns = json.loads(response.choices[0].message.content)
+            response = await self.analyzer_client.generate_response(request)
+            patterns = json.loads(response.content)
             return patterns if isinstance(patterns, list) else []
             
         except Exception as e:
@@ -194,7 +194,7 @@ class ResponseAnalyzer:
 class AdaptivePromptGenerator:
     """Generates new prompts based on analysis of previous results"""
     
-    def __init__(self, generator_client: OpenAI, analyzer: ResponseAnalyzer):
+    def __init__(self, generator_client: BaseModelClient, analyzer: ResponseAnalyzer):
         self.generator_client = generator_client
         self.analyzer = analyzer
         self.learned_patterns = defaultdict(list)
@@ -364,14 +364,15 @@ class AdaptivePromptGenerator:
         """Call the LLM to generate prompts"""
         
         try:
-            response = self.generator_client.chat.completions.create(
+            request = ModelRequest(
+                prompt=generation_prompt,
                 model="gpt-4",
-                messages=[{"role": "user", "content": generation_prompt}],
                 max_tokens=800,
                 temperature=0.8
             )
             
-            content = response.choices[0].message.content.strip()
+            response = await self.generator_client.generate_response(request)
+            content = response.content.strip()
             prompts = [line.strip() for line in content.split('\n') if line.strip()]
             
             # Ensure we have the requested number of prompts

@@ -11,11 +11,11 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from openai import OpenAI
 from config import load_configuration, create_sample_config, PromptInjectorConfig
 from test_orchestrator import TestOrchestrator
 from prompt_injector import InjectionType
 from static_prompts import get_static_prompts
+from model_client import ModelClientFactory
 
 
 def create_progress_reporter(verbose: bool = False):
@@ -44,14 +44,24 @@ async def run_quick_test(config: PromptInjectorConfig, verbose: bool = False):
     """Run a quick test with a small subset of prompts"""
     print("Running quick test (10 static + 5 adaptive prompts)...")
     
-    # Initialize clients
-    target_client = OpenAI(
-        api_key=config.api.target_api_key,
-        base_url=config.api.target_base_url
+    # Initialize model clients
+    target_client = ModelClientFactory.create_client(
+        client_type=config.api.target.type,
+        endpoint_url=config.api.target.endpoint_url,
+        api_key=config.api.target.api_key,
+        model=config.api.target.model,
+        headers=config.api.target.headers,
+        timeout=config.api.target.timeout,
+        max_retries=config.api.target.max_retries
     )
-    analyzer_client = OpenAI(
-        api_key=config.api.analyzer_api_key,
-        base_url=config.api.analyzer_base_url
+    analyzer_client = ModelClientFactory.create_client(
+        client_type=config.api.analyzer.type,
+        endpoint_url=config.api.analyzer.endpoint_url,
+        api_key=config.api.analyzer.api_key,
+        model=config.api.analyzer.model,
+        headers=config.api.analyzer.headers,
+        timeout=config.api.analyzer.timeout,
+        max_retries=config.api.analyzer.max_retries
     )
     
     # Create orchestrator
@@ -87,14 +97,24 @@ async def run_full_test(config: PromptInjectorConfig,
     """Run a comprehensive test campaign"""
     print(f"Running full test ({static_tests} static + {adaptive_tests} adaptive prompts)...")
     
-    # Initialize clients
-    target_client = OpenAI(
-        api_key=config.api.target_api_key,
-        base_url=config.api.target_base_url
+    # Initialize model clients
+    target_client = ModelClientFactory.create_client(
+        client_type=config.api.target.type,
+        endpoint_url=config.api.target.endpoint_url,
+        api_key=config.api.target.api_key,
+        model=config.api.target.model,
+        headers=config.api.target.headers,
+        timeout=config.api.target.timeout,
+        max_retries=config.api.target.max_retries
     )
-    analyzer_client = OpenAI(
-        api_key=config.api.analyzer_api_key,
-        base_url=config.api.analyzer_base_url
+    analyzer_client = ModelClientFactory.create_client(
+        client_type=config.api.analyzer.type,
+        endpoint_url=config.api.analyzer.endpoint_url,
+        api_key=config.api.analyzer.api_key,
+        model=config.api.analyzer.model,
+        headers=config.api.analyzer.headers,
+        timeout=config.api.analyzer.timeout,
+        max_retries=config.api.analyzer.max_retries
     )
     
     # Create orchestrator
@@ -243,14 +263,24 @@ async def run_custom_prompts(config: PromptInjectorConfig, prompts_file: str, ve
     
     print(f"Running custom prompts test ({len(custom_prompts)} prompts)...")
     
-    # Initialize clients
-    target_client = OpenAI(
-        api_key=config.api.target_api_key,
-        base_url=config.api.target_base_url
+    # Initialize model clients
+    target_client = ModelClientFactory.create_client(
+        client_type=config.api.target.type,
+        endpoint_url=config.api.target.endpoint_url,
+        api_key=config.api.target.api_key,
+        model=config.api.target.model,
+        headers=config.api.target.headers,
+        timeout=config.api.target.timeout,
+        max_retries=config.api.target.max_retries
     )
-    analyzer_client = OpenAI(
-        api_key=config.api.analyzer_api_key,
-        base_url=config.api.analyzer_base_url
+    analyzer_client = ModelClientFactory.create_client(
+        client_type=config.api.analyzer.type,
+        endpoint_url=config.api.analyzer.endpoint_url,
+        api_key=config.api.analyzer.api_key,
+        model=config.api.analyzer.model,
+        headers=config.api.analyzer.headers,
+        timeout=config.api.analyzer.timeout,
+        max_retries=config.api.analyzer.max_retries
     )
     
     # Create tester directly
