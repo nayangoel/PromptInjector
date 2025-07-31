@@ -7,3 +7,5 @@
 
     # Ignore a directory and its contents
     __pycache__/
+    PromptInjectorScreenshots/
+    .claude/
