@@ -11,14 +11,6 @@
       },
       "timeout": 30,
       "max_retries": 3
-    },
-    "analyzer": {
-      "type": "anthropic",
-      "endpoint_url": "https://api.anthropic.com/v1/messages",
-      "api_key": "your-anthropic-api-key",
-      "model": "claude-3-sonnet-20240229",
-      "timeout": 30,
-      "max_retries": 3
     }
   },
   "models": {

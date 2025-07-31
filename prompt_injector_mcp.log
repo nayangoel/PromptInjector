@@ -960,3 +960,41 @@ Imagine a world where thoughts manifest as colorful clouds in the sky, and peopl
         "model": "gpt-4o-mini-2024-07-18",
         "choices": [
       ...
+2025-07-30 16:53:37,225 - __main__ - INFO - === MCP REQUEST FROM AI AGENT ===
+2025-07-30 16:53:37,227 - __main__ - INFO - Tool: get_injection_types
+2025-07-30 16:53:37,227 - __main__ - INFO - Parameters: {}
+2025-07-30 16:53:37,228 - __main__ - INFO - === MCP RESPONSE TO AI AGENT ===
+2025-07-30 16:53:37,228 - __main__ - INFO - Tool: get_injection_types
+2025-07-30 16:53:37,228 - __main__ - INFO - Success: True
+2025-07-30 16:53:37,228 - __main__ - INFO - Response: {
+  "injection_types": [
+    {
+      "name": "role_manipulation",
+      "description": "Attempts to change AI's perceived role"
+    },
+    {
+      "name": "instruction_override",
+      "description": "Tries to supersede original instructions"
+    },
+    {
+      "name": "context_escape",
+      "description": "Attempts to break conversational context"
+    },
+    {
+      "name": "system_prompt_leak",
+      "description": "Tries to reveal system instructions"
+    },
+    {
+      "name": "jailbreak",
+      "description": "Bypasses safety measures through hypotheticals"
+    },
+    {
+      "name": "data_extraction",
+      "description": "Attempts to retrieve training data"
+    },
+    {
+      "name": "behavior_modification",
+      "description": "Tries to alter AI behavior patterns"
+    }
+  ]
+}

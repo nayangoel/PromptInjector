@@ -7,14 +7,6 @@
       "model": "llama2",
       "timeout": 30,
       "max_retries": 3
-    },
-    "analyzer": {
-      "type": "ollama",
-      "endpoint_url": "http://localhost:11434/api/generate", 
-      "api_key": "",
-      "model": "codellama",
-      "timeout": 30,
-      "max_retries": 3
     }
   },
   "models": {
