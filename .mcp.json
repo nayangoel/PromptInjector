@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "prompt-injector": {
+      "command": "/Users/nayan/Documents/Code/venv/bin/python3",
+      "args": [
+        "/Users/nayan/Documents/Code/PromptInjector/mcp_server.py",
+        "--stdio",
+        "--config",
+        "/Users/nayan/Documents/Code/PromptInjector/claude_code_config.json"
+      ],
+      "cwd": "/Users/nayan/Documents/Code/PromptInjector",
+      "env": {
+        "PYTHONPATH": "/Users/nayan/Documents/Code/PromptInjector"
+      }
+    }
+  }
+}
