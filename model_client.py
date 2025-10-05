@@ -116,6 +116,32 @@ class HTTPModelClient(BaseModelClient):
                                 self.logger.info(f"Token usage: {parsed_response.usage}")
                             
                             return parsed_response
+                        elif response.status == 429:  # Rate limit
+                            error_text = await response.text()
+                            self.logger.warning(f"=== RATE LIMIT HIT ===")
+                            self.logger.warning(f"Status: {response.status}")
+                            self.logger.warning(f"Error: {error_text}")
+                            
+                            # Try to extract retry delay from error response
+                            retry_delay = 60  # default 1 minute
+                            try:
+                                error_data = json.loads(error_text)
+                                if "error" in error_data and "details" in error_data["error"]:
+                                    for detail in error_data["error"]["details"]:
+                                        if detail.get("@type") == "type.googleapis.com/google.rpc.RetryInfo":
+                                            retry_delay_str = detail.get("retryDelay", "60s")
+                                            # Parse delay (e.g., "16s" -> 16)
+                                            retry_delay = int(retry_delay_str.rstrip('s'))
+                                            break
+                            except (json.JSONDecodeError, KeyError, ValueError):
+                                pass  # Use default delay
+                            
+                            if attempt < self.max_retries:
+                                self.logger.info(f"Rate limited, waiting {retry_delay} seconds before retry {attempt + 1}")
+                                await asyncio.sleep(retry_delay)
+                                continue
+                            else:
+                                raise Exception(f"HTTP {response.status}: {error_text}")
                         else:
                             error_text = await response.text()
                             self.logger.error(f"=== TARGET LLM ERROR ===")
@@ -303,6 +329,98 @@ class AnthropicClient(HTTPModelClient):
         )
 
 
+class GeminiClient(HTTPModelClient):
+    """Google Gemini client"""
+    
+    def __init__(self, api_key: str, endpoint_url: str, model: str = "gemini-pro", **config):
+        headers = {
+            "X-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        }
+        # Remove conflicting parameters from config
+        clean_config = {k: v for k, v in config.items() if k not in ['endpoint_url', 'api_key', 'headers']}
+        super().__init__(
+            endpoint_url=endpoint_url,
+            api_key="",  # API key is in headers
+            headers=headers,
+            **clean_config
+        )
+    
+    def _default_request_formatter(self, request: ModelRequest) -> Dict[str, Any]:
+        """Gemini-specific request format"""
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": request.prompt}]
+                }
+            ]
+        }
+        
+        if request.system_prompt:
+            payload["contents"].insert(0, {
+                "parts": [{"text": request.system_prompt}],
+                "role": "model"
+            })
+        
+        # Gemini generation config
+        generation_config = {}
+        if request.max_tokens:
+            generation_config["maxOutputTokens"] = request.max_tokens
+        if request.temperature is not None:
+            generation_config["temperature"] = request.temperature
+        if request.top_p is not None:
+            generation_config["topP"] = request.top_p
+            
+        if generation_config:
+            payload["generationConfig"] = generation_config
+            
+        return payload
+    
+    def _default_response_parser(self, response_data: Dict[str, Any], model: str) -> ModelResponse:
+        """Gemini-specific response parser"""
+        if "candidates" in response_data and response_data["candidates"]:
+            candidate = response_data["candidates"][0]
+            
+            # Check for content with parts
+            if "content" in candidate and "parts" in candidate["content"] and candidate["content"]["parts"]:
+                parts = candidate["content"]["parts"]
+                if parts and "text" in parts[0]:
+                    content = parts[0]["text"]
+                    return ModelResponse(
+                        content=content,
+                        usage=response_data.get("usageMetadata"),
+                        model=model,
+                        metadata={"raw_response": response_data}
+                    )
+            
+            # Handle MAX_TOKENS case where content might be empty or missing
+            finish_reason = candidate.get("finishReason")
+            if finish_reason == "MAX_TOKENS":
+                # Check if there's any partial content
+                content = ""
+                if "content" in candidate and "parts" in candidate["content"]:
+                    parts = candidate["content"]["parts"]
+                    if parts and "text" in parts[0]:
+                        content = parts[0]["text"]
+                
+                return ModelResponse(
+                    content=content,
+                    usage=response_data.get("usageMetadata"),
+                    model=model,
+                    metadata={
+                        "raw_response": response_data,
+                        "finish_reason": finish_reason,
+                        "truncated": True
+                    }
+                )
+        
+        # Fallback for error cases
+        if "error" in response_data:
+            raise Exception(f"Gemini API error: {response_data['error'].get('message', 'Unknown error')}")
+        
+        raise ValueError(f"Unable to parse Gemini response format: {response_data}")
+
+
 class ModelClientFactory:
     """Factory for creating model clients"""
     
@@ -318,6 +436,8 @@ class ModelClientFactory:
             return OllamaClient(**config)
         elif client_type == "anthropic":
             return AnthropicClient(**config)
+        elif client_type == "gemini":
+            return GeminiClient(**config)
         elif client_type == "http" or client_type == "generic":
             return HTTPModelClient(**config)
         else:
