@@ -1,4 +1,4 @@
-# Ignore a specific file
+# Ignore Python bytecode files
 .mcp.json
 claude_code_config.json
 prompt_injector_config.json
