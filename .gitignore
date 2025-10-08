@@ -1,6 +1,8 @@
  # Ignore a specific file
     .mcp.json
     claude_code_config.json
+    prompt_injector_config.json
+    campaign_full*
 
     # Ignore all files with a .log extension
     *.log
@@ -9,3 +11,4 @@
     __pycache__/
     PromptInjectorScreenshots/
     .claude/
+    venv/

@@ -65,9 +65,9 @@ class PromptInjectionTester:
             # Create model request
             request = ModelRequest(
                 prompt=prompt,
-                model=self.config.get('target_model', 'default'),
-                max_tokens=self.config.get('max_tokens', 500),
-                temperature=self.config.get('temperature', 0.7)
+                model = self.config.get('models', {}).get('target_model', 'default'),
+                max_tokens = self.config.get('models', {}).get('max_tokens', 500),
+                temperature = self.config.get('models', {}).get('temperature', 0.7)
             )
             
             # Get response from target model
