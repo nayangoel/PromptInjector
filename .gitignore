@@ -12,3 +12,4 @@ __pycache__/
 PromptInjectorScreenshots/
 .claude/
 venv/
+prompt_injector_config.json
