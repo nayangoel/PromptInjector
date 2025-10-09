@@ -1,11 +1,12 @@
- # Ignore a specific file
-    .mcp.json
-    claude_code_config.json
+# Ignore a specific file
+.mcp.json
+claude_code_config.json
+MCP_USAGE_GUIDE.md
 
-    # Ignore all files with a .log extension
-    *.log
+# Ignore all files with a .log extension
+*.log
 
-    # Ignore a directory and its contents
-    __pycache__/
-    PromptInjectorScreenshots/
-    .claude/
+# Ignore a directory and its contents
+__pycache__/
+PromptInjectorScreenshots/
+.claude/
