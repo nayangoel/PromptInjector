@@ -204,7 +204,7 @@ python main.py --full
 
 #### Custom Test Configuration
 ```bash
-python main.py --static 50 --adaptive 25 --verbose
+python main.py --full --static 20 --adaptive 10 --verbose
 ```
 
 #### Test Custom Prompts

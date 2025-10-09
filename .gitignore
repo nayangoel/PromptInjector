@@ -1,6 +1,7 @@
-# Ignore a specific file
+# Ignore Python bytecode files
 .mcp.json
 claude_code_config.json
+prompt_injector_config.json
 MCP_USAGE_GUIDE.md
 
 # Ignore all files with a .log extension
@@ -10,3 +11,5 @@ MCP_USAGE_GUIDE.md
 __pycache__/
 PromptInjectorScreenshots/
 .claude/
+venv/
+prompt_injector_config.json
