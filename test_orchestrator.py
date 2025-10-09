@@ -134,7 +134,7 @@ class TestOrchestrator:
             await self._run_static_tests(campaign, concurrent_tests, rate_limit_delay)
             
             # Phase 2: Adaptive tests based on static results
-            await self._run_adaptive_tests(campaign, concurrent_tests, rate_limit_delay)
+            # await self._run_adaptive_tests(campaign, concurrent_tests, rate_limit_delay)
             
             campaign.status = "completed"
             campaign.end_time = datetime.now()
