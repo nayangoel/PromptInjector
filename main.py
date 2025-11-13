@@ -11,11 +11,32 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from config import load_configuration, create_sample_config, PromptInjectorConfig
+from config import load_configuration, create_sample_config, PromptInjectorConfig, ModelEndpointConfig
 from test_orchestrator import TestOrchestrator
 from prompt_injector import InjectionType
 from static_prompts import get_static_prompts
 from model_client import ModelClientFactory
+
+
+def create_client_from_config(endpoint_config: ModelEndpointConfig):
+    """Helper to create a client from endpoint config"""
+    params = {
+        'client_type': endpoint_config.type,
+        'endpoint_url': endpoint_config.endpoint_url,
+        'api_key': endpoint_config.api_key,
+        'model': endpoint_config.model,
+        'headers': endpoint_config.headers,
+        'timeout': endpoint_config.timeout,
+        'max_retries': endpoint_config.max_retries
+    }
+
+    # Add Sierra-specific parameters if present
+    if endpoint_config.token is not None:
+        params['token'] = endpoint_config.token
+    if endpoint_config.release is not None:
+        params['release'] = endpoint_config.release
+
+    return ModelClientFactory.create_client(**params)
 
 
 def create_progress_reporter(verbose: bool = False):
@@ -45,24 +66,8 @@ async def run_quick_test(config: PromptInjectorConfig, verbose: bool = False):
     print("Running quick test (10 static + 5 adaptive prompts)...")
     
     # Initialize model clients
-    target_client = ModelClientFactory.create_client(
-        client_type=config.api.target.type,
-        endpoint_url=config.api.target.endpoint_url,
-        api_key=config.api.target.api_key,
-        model=config.api.target.model,
-        headers=config.api.target.headers,
-        timeout=config.api.target.timeout,
-        max_retries=config.api.target.max_retries
-    )
-    analyzer_client = ModelClientFactory.create_client(
-        client_type=config.api.analyzer.type,
-        endpoint_url=config.api.analyzer.endpoint_url,
-        api_key=config.api.analyzer.api_key,
-        model=config.api.analyzer.model,
-        headers=config.api.analyzer.headers,
-        timeout=config.api.analyzer.timeout,
-        max_retries=config.api.analyzer.max_retries
-    )
+    target_client = create_client_from_config(config.api.target)
+    analyzer_client = create_client_from_config(config.api.analyzer)
     
     # Create orchestrator
     orchestrator = TestOrchestrator(target_client, analyzer_client, config.to_dict())
@@ -98,24 +103,8 @@ async def run_full_test(config: PromptInjectorConfig,
     print(f"Running full test ({static_tests} static + {adaptive_tests} adaptive prompts)...")
     
     # Initialize model clients
-    target_client = ModelClientFactory.create_client(
-        client_type=config.api.target.type,
-        endpoint_url=config.api.target.endpoint_url,
-        api_key=config.api.target.api_key,
-        model=config.api.target.model,
-        headers=config.api.target.headers,
-        timeout=config.api.target.timeout,
-        max_retries=config.api.target.max_retries
-    )
-    analyzer_client = ModelClientFactory.create_client(
-        client_type=config.api.analyzer.type,
-        endpoint_url=config.api.analyzer.endpoint_url,
-        api_key=config.api.analyzer.api_key,
-        model=config.api.analyzer.model,
-        headers=config.api.analyzer.headers,
-        timeout=config.api.analyzer.timeout,
-        max_retries=config.api.analyzer.max_retries
-    )
+    target_client = create_client_from_config(config.api.target)
+    analyzer_client = create_client_from_config(config.api.analyzer)
     
     # Create orchestrator
     orchestrator = TestOrchestrator(target_client, analyzer_client, config.to_dict())
@@ -264,24 +253,8 @@ async def run_custom_prompts(config: PromptInjectorConfig, prompts_file: str, ve
     print(f"Running custom prompts test ({len(custom_prompts)} prompts)...")
     
     # Initialize model clients
-    target_client = ModelClientFactory.create_client(
-        client_type=config.api.target.type,
-        endpoint_url=config.api.target.endpoint_url,
-        api_key=config.api.target.api_key,
-        model=config.api.target.model,
-        headers=config.api.target.headers,
-        timeout=config.api.target.timeout,
-        max_retries=config.api.target.max_retries
-    )
-    analyzer_client = ModelClientFactory.create_client(
-        client_type=config.api.analyzer.type,
-        endpoint_url=config.api.analyzer.endpoint_url,
-        api_key=config.api.analyzer.api_key,
-        model=config.api.analyzer.model,
-        headers=config.api.analyzer.headers,
-        timeout=config.api.analyzer.timeout,
-        max_retries=config.api.analyzer.max_retries
-    )
+    target_client = create_client_from_config(config.api.target)
+    analyzer_client = create_client_from_config(config.api.analyzer)
     
     # Create tester directly
     from prompt_injector import PromptInjectionTester

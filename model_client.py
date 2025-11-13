@@ -421,15 +421,125 @@ class GeminiClient(HTTPModelClient):
         raise ValueError(f"Unable to parse Gemini response format: {response_data}")
 
 
+class SierraClient(HTTPModelClient):
+    """Sierra AI chatbot client - handles Sierra's streaming NDJSON format"""
+
+    def __init__(self, token: str, release: str = "infosec", endpoint_url: str = "https://api.sierra.chat/chat", **config):
+        headers = {
+            "Sierra-API-Compatibility-Date": "2025-02-01",
+            "Content-Type": "application/json"
+        }
+        # Remove conflicting parameters from config
+        clean_config = {k: v for k, v in config.items() if k not in ['endpoint_url', 'api_key', 'headers']}
+        super().__init__(
+            endpoint_url=endpoint_url,
+            api_key="",  # Not used by Sierra
+            headers=headers,
+            **clean_config
+        )
+        self.token = token
+        self.release = release
+
+    async def generate_response(self, request: ModelRequest) -> ModelResponse:
+        """Generate response from Sierra API - handles streaming NDJSON format"""
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                # Format request payload
+                payload = self._default_request_formatter(request)
+
+                # Log outgoing request to target LLM
+                self.logger.info(f"=== REQUEST TO TARGET LLM ===")
+                self.logger.info(f"Endpoint: {self.endpoint_url}")
+                self.logger.info(f"Model: {request.model}")
+                self.logger.info(f"Prompt: {request.prompt[:500]}{'...' if len(request.prompt) > 500 else ''}")
+                self.logger.info(f"Request payload: {json.dumps(payload, indent=2)}")
+
+                # Make HTTP request
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
+                    async with session.post(
+                        self.endpoint_url,
+                        json=payload,
+                        headers=self.headers
+                    ) as response:
+
+                        if response.status == 200:
+                            # Sierra returns newline-delimited JSON (NDJSON) stream
+                            response_text = await response.text()
+                            parsed_response = self._parse_ndjson_response(response_text, request.model)
+
+                            # Log response from target LLM
+                            self.logger.info(f"=== RESPONSE FROM TARGET LLM ===")
+                            self.logger.info(f"Status: {response.status}")
+                            self.logger.info(f"Model: {request.model}")
+                            self.logger.info(f"Response content: {parsed_response.content[:500]}{'...' if len(parsed_response.content) > 500 else ''}")
+
+                            return parsed_response
+                        else:
+                            error_text = await response.text()
+                            self.logger.error(f"=== TARGET LLM ERROR ===")
+                            self.logger.error(f"Status: {response.status}")
+                            self.logger.error(f"Error: {error_text}")
+                            raise Exception(f"HTTP {response.status}: {error_text}")
+
+            except Exception as e:
+                if attempt < self.max_retries:
+                    self.logger.warning(f"Request failed (attempt {attempt + 1}), retrying: {e}")
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                else:
+                    self.logger.error(f"Request failed after {self.max_retries + 1} attempts: {e}")
+                    raise
+
+    def _default_request_formatter(self, request: ModelRequest) -> Dict[str, Any]:
+        """Sierra-specific request format"""
+        return {
+            "token": self.token,
+            "release": self.release,
+            "clientEvent": {
+                "type": "message",
+                "message": {
+                    "content": request.prompt
+                }
+            }
+        }
+
+    def _parse_ndjson_response(self, response_text: str, model: str) -> ModelResponse:
+        """Parse Sierra's newline-delimited JSON response format"""
+        # Sierra returns multiple JSON objects separated by newlines
+        # We need to extract the message text from the stream
+
+        messages = []
+        for line in response_text.strip().split('\n'):
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+                if data.get('type') == 'message' and 'message' in data:
+                    msg = data['message']
+                    if 'text' in msg:
+                        messages.append(msg['text'])
+            except json.JSONDecodeError:
+                continue
+
+        # Combine all message texts
+        content = ' '.join(messages) if messages else response_text
+
+        return ModelResponse(
+            content=content,
+            model=model,
+            metadata={"raw_response": response_text}
+        )
+
+
 class ModelClientFactory:
     """Factory for creating model clients"""
-    
+
     @staticmethod
     def create_client(client_type: str, **config) -> BaseModelClient:
         """Create a model client based on type"""
-        
+
         client_type = client_type.lower()
-        
+
         if client_type == "openai":
             return OpenAIClient(**config)
         elif client_type == "ollama":
@@ -438,6 +548,8 @@ class ModelClientFactory:
             return AnthropicClient(**config)
         elif client_type == "gemini":
             return GeminiClient(**config)
+        elif client_type == "sierra":
+            return SierraClient(**config)
         elif client_type == "http" or client_type == "generic":
             return HTTPModelClient(**config)
         else:

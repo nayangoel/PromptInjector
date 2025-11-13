@@ -14,13 +14,16 @@ from pathlib import Path
 @dataclass
 class ModelEndpointConfig:
     """Configuration for a model endpoint"""
-    type: str  # openai, anthropic, ollama, http
+    type: str  # openai, anthropic, ollama, http, sierra
     endpoint_url: str
     api_key: Optional[str] = None
     model: str = "default"
     headers: Optional[Dict[str, str]] = None
     timeout: int = 30
     max_retries: int = 3
+    # Sierra-specific parameters
+    token: Optional[str] = None
+    release: Optional[str] = None
 
 
 @dataclass

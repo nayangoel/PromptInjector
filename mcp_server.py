@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from dataclasses import asdict
 import argparse
 
-from config import load_configuration, PromptInjectorConfig
+from config import load_configuration, PromptInjectorConfig, ModelEndpointConfig
 from model_client import ModelClientFactory, BaseModelClient
 from prompt_injector import InjectionType, TestResult
 from static_prompts import get_static_prompts
@@ -44,36 +44,40 @@ class MCPPromptInjectorServer:
             "get_test_status": self._get_test_status,
             "clear_results": self._clear_results
         }
-    
+
+    def _create_client_from_config(self, endpoint_config: ModelEndpointConfig):
+        """Helper to create a client from endpoint config"""
+        params = {
+            'client_type': endpoint_config.type,
+            'endpoint_url': endpoint_config.endpoint_url,
+            'api_key': endpoint_config.api_key,
+            'model': endpoint_config.model,
+            'headers': endpoint_config.headers,
+            'timeout': endpoint_config.timeout,
+            'max_retries': endpoint_config.max_retries
+        }
+
+        # Add Sierra-specific parameters if present
+        if endpoint_config.token is not None:
+            params['token'] = endpoint_config.token
+        if endpoint_config.release is not None:
+            params['release'] = endpoint_config.release
+
+        return ModelClientFactory.create_client(**params)
+
     async def initialize(self):
         """Initialize the MCP server components"""
         try:
             # Create target client (required)
-            self.target_client = ModelClientFactory.create_client(
-                client_type=self.config.api.target.type,
-                endpoint_url=self.config.api.target.endpoint_url,
-                api_key=self.config.api.target.api_key,
-                model=self.config.api.target.model,
-                headers=self.config.api.target.headers,
-                timeout=self.config.api.target.timeout,
-                max_retries=self.config.api.target.max_retries
-            )
-            
+            self.target_client = self._create_client_from_config(self.config.api.target)
+
             # Analyzer client is optional - external MCP agent (like Claude Code) acts as analyzer
             self.analyzer_client = None
             try:
-                if (self.config.api.analyzer and 
-                    self.config.api.analyzer.api_key and 
+                if (self.config.api.analyzer and
+                    self.config.api.analyzer.api_key and
                     self.config.api.analyzer.api_key != "dummy-key"):
-                    self.analyzer_client = ModelClientFactory.create_client(
-                        client_type=self.config.api.analyzer.type,
-                        endpoint_url=self.config.api.analyzer.endpoint_url,
-                        api_key=self.config.api.analyzer.api_key,
-                        model=self.config.api.analyzer.model,
-                        headers=self.config.api.analyzer.headers,
-                        timeout=self.config.api.analyzer.timeout,
-                        max_retries=self.config.api.analyzer.max_retries
-                    )
+                    self.analyzer_client = self._create_client_from_config(self.config.api.analyzer)
             except Exception as e:
                 self.logger.info(f"No analyzer client configured (external agent will be analyzer): {e}")
             
